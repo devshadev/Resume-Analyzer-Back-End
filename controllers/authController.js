@@ -177,14 +177,16 @@ export const githubCallback = (req, res) => {
     { expiresIn: process.env.JWT_EXPIRE || '7d' }
   );
 
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+
   res.cookie('token', token, {
     expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    secure: true,
+    sameSite: 'none',
   });
 
-  res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/dashboard`);
+  res.redirect(`${clientUrl}/auth/callback`);
 };
 
 // @desc    Update user profile

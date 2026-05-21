@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 4000;
 app.use(cors({
   origin: (origin, callback) => {
     const allowedOrigins = [
-      'http://localhost:5173',
+      'http://localhost:5173', 'https://resume-analyzer-front-end-jet.vercel.app',
       process.env.CLIENT_URL,
     ].filter(Boolean); // removes undefined if CLIENT_URL not set
 

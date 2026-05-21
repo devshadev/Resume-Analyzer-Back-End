@@ -23,16 +23,29 @@ export const getRelevantJobs = async (req, res) => {
     const options = {
       method: 'GET',
       headers: {
-        'X-RapidAPI-Key':  process.env.RAPIDAPI_KEY,
-        'X-RapidAPI-Host': 'jsearch.p.rapidapi.com',
+        'x-rapidapi-key': process.env.RAPIDAPI_KEY,
+        'x-rapidapi-host': 'jsearch.p.rapidapi.com',
+        'Content-Type': 'application/json',
       },
     };
 
     const params = new URLSearchParams({
+      query: query,
+      num_pages: '1',
+      country: 'us',
+      date_posted: 'all',
+    });
+
+    const response = await fetch(
+      `https://jsearch.p.rapidapi.com/search-v2?${params.toString()}`,
+      options
+    );
+
+    const params = new URLSearchParams({
       query,
-      page:         '1',
-      num_pages:    '1',
-      date_posted:  'month',
+      page: '1',
+      num_pages: '1',
+      date_posted: 'month',
       remote_jobs_only: 'false',
     });
 
@@ -49,19 +62,19 @@ export const getRelevantJobs = async (req, res) => {
 
     // Normalize into clean shape for the frontend
     const jobs = (data.data || []).slice(0, 10).map((job) => ({
-      id:              job.job_id,
-      title:           job.job_title,
-      company:         job.employer_name,
-      companyLogo:     job.employer_logo || null,
-      location:        job.job_is_remote
+      id: job.job_id,
+      title: job.job_title,
+      company: job.employer_name,
+      companyLogo: job.employer_logo || null,
+      location: job.job_is_remote
         ? 'Remote'
         : `${job.job_city || ''}${job.job_city && job.job_country ? ', ' : ''}${job.job_country || ''}`.trim() || 'Location not specified',
-      salary:          formatSalary(job),
-      employmentType:  job.job_employment_type || null,
-      description:     job.job_description?.slice(0, 200) + '...' || null,
-      url:             job.job_apply_link || job.job_google_link,
-      publishedAt:     job.job_posted_at_datetime_utc,
-      via:             job.job_publisher || null,
+      salary: formatSalary(job),
+      employmentType: job.job_employment_type || null,
+      description: job.job_description?.slice(0, 200) + '...' || null,
+      url: job.job_apply_link || job.job_google_link,
+      publishedAt: job.job_posted_at_datetime_utc,
+      via: job.job_publisher || null,
     }));
 
     res.status(200).json({

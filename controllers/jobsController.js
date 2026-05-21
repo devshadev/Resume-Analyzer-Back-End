@@ -1,10 +1,10 @@
-// jobsController.js — fetches relevant jobs using JSearch API via RapidAPI
-// JSearch pulls from Google for Jobs — LinkedIn, Indeed, Glassdoor and more
+import Report from '../models/Report.js';
 
+// @desc    Get relevant jobs based on report data
+// @route   GET /api/jobs/relevant/:reportId
+// @access  Private
 export const getRelevantJobs = async (req, res) => {
   try {
-    const Report = (await import('../models/Report.js')).default;
-
     const report = await Report.findById(req.params.reportId);
 
     if (!report) {
@@ -17,41 +17,28 @@ export const getRelevantJobs = async (req, res) => {
 
     const { jobTitle, experienceLevel } = report.jobData;
 
-    // Build a smart search query from job title + experience level
-    const query = `${jobTitle} ${experienceLevel === 'senior' || experienceLevel === 'lead' ? 'senior' : ''} developer`.trim();
-
-    const options = {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-key': process.env.RAPIDAPI_KEY,
-        'x-rapidapi-host': 'jsearch.p.rapidapi.com',
-        'Content-Type': 'application/json',
-      },
-    };
+    // Build search query from job title + experience level
+    const query = `${jobTitle} ${
+      experienceLevel === 'senior' || experienceLevel === 'lead' ? 'senior' : ''
+    } developer`.trim();
 
     const params = new URLSearchParams({
-      query: query,
-      num_pages: '1',
-      country: 'us',
+      query,
+      num_pages:   '1',
+      country:     'us',
       date_posted: 'all',
     });
 
     const response = await fetch(
       `https://jsearch.p.rapidapi.com/search-v2?${params.toString()}`,
-      options
-    );
-
-    const params = new URLSearchParams({
-      query,
-      page: '1',
-      num_pages: '1',
-      date_posted: 'month',
-      remote_jobs_only: 'false',
-    });
-
-    const response = await fetch(
-      `https://jsearch.p.rapidapi.com/search?${params.toString()}`,
-      options
+      {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-key':  process.env.RAPIDAPI_KEY,
+          'x-rapidapi-host': 'jsearch.p.rapidapi.com',
+          'Content-Type':    'application/json',
+        },
+      }
     );
 
     if (!response.ok) {
@@ -60,26 +47,25 @@ export const getRelevantJobs = async (req, res) => {
 
     const data = await response.json();
 
-    // Normalize into clean shape for the frontend
     const jobs = (data.data || []).slice(0, 10).map((job) => ({
-      id: job.job_id,
-      title: job.job_title,
-      company: job.employer_name,
-      companyLogo: job.employer_logo || null,
-      location: job.job_is_remote
+      id:             job.job_id,
+      title:          job.job_title,
+      company:        job.employer_name,
+      companyLogo:    job.employer_logo || null,
+      location:       job.job_is_remote
         ? 'Remote'
         : `${job.job_city || ''}${job.job_city && job.job_country ? ', ' : ''}${job.job_country || ''}`.trim() || 'Location not specified',
-      salary: formatSalary(job),
+      salary:         formatSalary(job),
       employmentType: job.job_employment_type || null,
-      description: job.job_description?.slice(0, 200) + '...' || null,
-      url: job.job_apply_link || job.job_google_link,
-      publishedAt: job.job_posted_at_datetime_utc,
-      via: job.job_publisher || null,
+      description:    job.job_description?.slice(0, 200) + '...' || null,
+      url:            job.job_apply_link || job.job_google_link,
+      publishedAt:    job.job_posted_at_datetime_utc,
+      via:            job.job_publisher || null,
     }));
 
     res.status(200).json({
       success: true,
-      total: data.data?.length || 0,
+      total:       data.data?.length || 0,
       jobs,
       searchQuery: query,
     });

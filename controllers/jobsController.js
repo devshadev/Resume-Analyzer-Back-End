@@ -1,169 +1,93 @@
-// controllers/jobsController.js
-
-import axios from 'axios';
-
-// ─── Get relevant jobs from hh.ru ────────────────────────────────────────────
-// @desc    Get relevant jobs based on report data
-// @route   GET /api/jobs/relevant/:reportId
-// @access  Private
+// jobsController.js — fetches relevant jobs using JSearch API via RapidAPI
+// JSearch pulls from Google for Jobs — LinkedIn, Indeed, Glassdoor and more
 
 export const getRelevantJobs = async (req, res) => {
   try {
-    // Dynamic import for Report model
     const Report = (await import('../models/Report.js')).default;
 
-    // Find report
     const report = await Report.findById(req.params.reportId);
 
     if (!report) {
-      return res.status(404).json({
-        success: false,
-        error: 'Report not found.',
-      });
+      return res.status(404).json({ success: false, error: 'Report not found.' });
     }
 
-    // Check ownership
     if (report.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        error: 'Not authorised.',
-      });
+      return res.status(403).json({ success: false, error: 'Not authorised.' });
     }
 
-    // ─── Build search query ──────────────────────────────────────────────────
+    const { jobTitle, experienceLevel } = report.jobData;
 
-    const { jobTitle, experienceLevel } = report.jobData || {};
+    // Build a smart search query from job title + experience level
+    const query = `${jobTitle} ${experienceLevel === 'senior' || experienceLevel === 'lead' ? 'senior' : ''} developer`.trim();
 
-    // Safer search query
-    const topSkills =
-      report.topStrengths?.slice(0, 3).join(' ') || '';
-
-    const searchText = `${jobTitle || ''} ${topSkills}`.trim();
-
-    // ─── Experience mapping ──────────────────────────────────────────────────
-
-    const experienceMap = {
-      entry: 'between1And3',
-      junior: 'between1And3',
-      mid: 'between3And6',
-      senior: 'moreThan6',
-      lead: 'moreThan6',
+    const options = {
+      method: 'GET',
+      headers: {
+        'X-RapidAPI-Key':  process.env.RAPIDAPI_KEY,
+        'X-RapidAPI-Host': 'jsearch.p.rapidapi.com',
+      },
     };
 
-    const experience =
-      experienceMap[experienceLevel] || 'between3And6';
+    const params = new URLSearchParams({
+      query,
+      page:         '1',
+      num_pages:    '1',
+      date_posted:  'month',
+      remote_jobs_only: 'false',
+    });
 
-    // ─── Call hh.ru API ──────────────────────────────────────────────────────
-
-    const response = await axios.get(
-      'https://api.hh.ru/vacancies',
-      {
-        params: {
-          text: searchText,
-          experience,
-          per_page: 10,
-          page: 0,
-          order_by: 'relevance',
-        },
-
-        headers: {
-          // IMPORTANT: hh.ru requires valid User-Agent
-          'User-Agent':
-            'ResumeAnalyzer/1.0 (resumeanalyzer@example.com)',
-        },
-
-        timeout: 10000,
-      }
+    const response = await fetch(
+      `https://jsearch.p.rapidapi.com/search?${params.toString()}`,
+      options
     );
 
-    const data = response.data;
+    if (!response.ok) {
+      throw new Error(`JSearch API returned ${response.status}`);
+    }
 
-    // ─── Normalize jobs ──────────────────────────────────────────────────────
+    const data = await response.json();
 
-    const jobs = (data.items || []).map((job) => ({
-      id: job.id,
-
-      title: job.name || 'Untitled Job',
-
-      company:
-        job.employer?.name || 'Unknown company',
-
-      companyLogo:
-        job.employer?.logo_urls?.['90'] || null,
-
-      location:
-        job.area?.name || 'Remote',
-
-      salary: formatSalary(job.salary),
-
-      experience:
-        job.experience?.name || null,
-
-      employment:
-        job.employment?.name || null,
-
-      schedule:
-        job.schedule?.name || null,
-
-      snippet:
-        job.snippet?.responsibility ||
-        job.snippet?.requirement ||
-        null,
-
-      url: job.alternate_url,
-
-      publishedAt: job.published_at,
+    // Normalize into clean shape for the frontend
+    const jobs = (data.data || []).slice(0, 10).map((job) => ({
+      id:              job.job_id,
+      title:           job.job_title,
+      company:         job.employer_name,
+      companyLogo:     job.employer_logo || null,
+      location:        job.job_is_remote
+        ? 'Remote'
+        : `${job.job_city || ''}${job.job_city && job.job_country ? ', ' : ''}${job.job_country || ''}`.trim() || 'Location not specified',
+      salary:          formatSalary(job),
+      employmentType:  job.job_employment_type || null,
+      description:     job.job_description?.slice(0, 200) + '...' || null,
+      url:             job.job_apply_link || job.job_google_link,
+      publishedAt:     job.job_posted_at_datetime_utc,
+      via:             job.job_publisher || null,
     }));
 
-    // ─── Success response ────────────────────────────────────────────────────
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      total: data.found || 0,
+      total: data.data?.length || 0,
       jobs,
-      searchQuery: searchText,
+      searchQuery: query,
     });
   } catch (error) {
-    // ─── Detailed logging ────────────────────────────────────────────────────
-
-    console.error('HH.ru Jobs Fetch Error:', {
-      message: error.message,
-      status: error.response?.status,
-      data: error.response?.data,
-      stack: error.stack,
-    });
-
-    return res.status(500).json({
+    console.error('Jobs fetch error:', error.message);
+    res.status(500).json({
       success: false,
-      error:
-        error.response?.data?.description ||
-        error.message ||
-        'Failed to fetch relevant jobs.',
+      error: 'Failed to fetch relevant jobs. Please try again.',
     });
   }
 };
 
-// ─── Helper: Format salary ───────────────────────────────────────────────────
-
-const formatSalary = (salary) => {
-  if (!salary) return null;
-
-  const currency =
-    salary.currency === 'RUR'
-      ? '₽'
-      : salary.currency || '';
-
-  if (salary.from && salary.to) {
-    return `${salary.from.toLocaleString()} – ${salary.to.toLocaleString()} ${currency}`;
+// ─── Helper — format salary ───────────────────────────────────────────────────
+const formatSalary = (job) => {
+  if (!job.job_min_salary && !job.job_max_salary) return null;
+  const currency = job.job_salary_currency || 'USD';
+  const period = job.job_salary_period ? `/${job.job_salary_period.toLowerCase()}` : '';
+  if (job.job_min_salary && job.job_max_salary) {
+    return `${Number(job.job_min_salary).toLocaleString()} – ${Number(job.job_max_salary).toLocaleString()} ${currency}${period}`;
   }
-
-  if (salary.from) {
-    return `from ${salary.from.toLocaleString()} ${currency}`;
-  }
-
-  if (salary.to) {
-    return `up to ${salary.to.toLocaleString()} ${currency}`;
-  }
-
+  if (job.job_min_salary) return `From ${Number(job.job_min_salary).toLocaleString()} ${currency}${period}`;
+  if (job.job_max_salary) return `Up to ${Number(job.job_max_salary).toLocaleString()} ${currency}${period}`;
   return null;
 };

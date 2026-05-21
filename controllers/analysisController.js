@@ -6,7 +6,7 @@ import {
   analyzeResume,
   generateCoverLetter,
   humanizeCoverLetter,
-} from '../utils/AiOrchestrator.js';
+} from '../utils/aiOrchestrator.js';
 
 // @desc    Run full resume analysis
 // @route   POST /api/analysis/run

@@ -17,9 +17,21 @@ const PORT = process.env.PORT || 4000;
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: 'http://localhost:5173', // Vite dev server
-  credentials: true,               // allows cookies to be sent cross-origin
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'http://localhost:5173',
+      process.env.CLIENT_URL,
+    ].filter(Boolean); // removes undefined if CLIENT_URL not set
+
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked: ${origin}`));
+    }
+  },
+  credentials: true,
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());

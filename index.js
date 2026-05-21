@@ -10,6 +10,7 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/auth.js';
 import configurePassport from './config/passport.js';
 import analysisRoutes from './routes/analysis.js';
+import jobsRoutes from './routes/jobs.js'
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -29,6 +30,7 @@ app.use(passport.initialize());
 // ─── Routes ──────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/analysis', analysisRoutes);
+app.use('/api/jobs', jobsRoutes);
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ─── Health check ────────────────────────────────────────────────────────────

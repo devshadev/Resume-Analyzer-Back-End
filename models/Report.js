@@ -29,26 +29,26 @@ const reportSchema = new mongoose.Schema(
 
     // Job details
     jobData: {
-      jobTitle:        { type: String, required: true },
-      company:         { type: String, required: true },
-      jobDescription:  { type: String, required: true },
+      jobTitle: { type: String, required: true },
+      company: { type: String, required: true },
+      jobDescription: { type: String, required: true },
       experienceLevel: { type: String },
-      requiredSkills:  [String],
-      mode:            { type: String, enum: ['ats', 'human'], default: 'ats' },
+      requiredSkills: [String],
+      mode: { type: String, enum: ['ats', 'human'], default: 'ats' },
     },
 
     // Scores
     matchScore: { type: Number, required: true },
-    atsScore:   { type: Number, required: true },
+    atsScore: { type: Number, required: true },
 
     // Scoring details
     matchDetails: {
-      keywordScore:    Number,
-      sectionScore:    Number,
-      skillScore:      Number,
+      keywordScore: Number,
+      sectionScore: Number,
+      skillScore: Number,
       matchedKeywords: [String],
-      missingSkills:   [String],
-      sectionsFound:   [String],
+      missingSkills: [String],
+      sectionsFound: [String],
     },
 
     // ATS checks
@@ -62,34 +62,37 @@ const reportSchema = new mongoose.Schema(
 
     // AI analysis — Call 1
     sectionFeedback: [sectionFeedbackSchema],
-    keywordGaps:     [String],
-    topStrengths:    [String],
-    criticalIssues:  [String],
-    overallSummary:  String,
+    keywordGaps: [String],
+    topStrengths: [String],
+    criticalIssues: [String],
+    overallSummary: String,
 
     // Cover letter — Call 2
     coverLetter: {
-      paragraphs:  [coverLetterParagraphSchema],
+      paragraphs: [coverLetterParagraphSchema],
       subjectLine: String,
     },
 
     // Humanized cover letter — Call 3
     humanizedLetter: {
       refinedLetter: String,
-      changesMade:   [String],
+      changesMade: [String],
     },
 
     // Status
     status: {
       type: String,
-      enum: ['processing', 'completed', 'failed'],
+      enum: ['processing', 'completed', 'failed', 'partial'],
       default: 'processing',
     },
-
+    failureReason: {
+      type: String,
+      default: null,
+    },
     // Resume metadata — never store the actual text
     resumeMetadata: {
-      fileName:  String,
-      fileType:  String,
+      fileName: String,
+      fileType: String,
       charCount: Number,
     },
   },
